@@ -43,8 +43,6 @@ fn create_santas_lists(input: &str) -> SantasLists {
     left_list.sort();
     right_list.sort();
 
-    println!("bob {}", left_list[0].to_string());
-
     return SantasLists {left_list, right_list};
 }
 
