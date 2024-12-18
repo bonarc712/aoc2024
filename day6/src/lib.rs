@@ -17,11 +17,11 @@ struct Position {
     y: i32
 }
 
-/*#[derive(Clone, Debug, PartialEq)]
-struct ObstacleHit {
+#[derive(Clone, Debug, PartialEq)]
+struct Move {
     dir: Direction,
     pos: Position
-}*/
+}
 
 pub fn read_line(line: &str) -> Vec<char> {
     return line.chars().collect();
@@ -147,7 +147,7 @@ pub fn analyze_guards_patrol_pattern(lines: &str) -> u32 {
 
     loop { // action loop
         let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
-        
+
         if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
             map[source_position.y as usize][source_position.x as usize] = 'X';
             break;
@@ -186,21 +186,21 @@ pub fn find_all_possible_obstructions_old(lines: &str) -> u32 {
 
     loop { // action loop
 
-        let position_on_the_left = get_destination_position(source_position.clone(), 
-            get_direction_rotating_from(guard_orientation.clone()));
-        
+        let position_on_the_left = get_destination_position(source_position.clone(),
+                                                            get_direction_rotating_from(guard_orientation.clone()));
+
         println!("New pos: {:?}", position_on_the_left);
 
 
         if is_position_inside_of_map(position_on_the_left.clone(), map.clone()) &&
             is_obstacle(map[position_on_the_left.y as usize][position_on_the_left.x as usize]) //&& 
-            //visited_obstacles.get(visited_obstacles.len() - 1).unwrap() != &position_on_the_left 
-            {
+        //visited_obstacles.get(visited_obstacles.len() - 1).unwrap() != &position_on_the_left
+        {
             visited_obstacles.push(position_on_the_left);
         }
 
         let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
-        
+
         if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
             map[source_position.y as usize][source_position.x as usize] = 'X';
             break;
@@ -234,7 +234,7 @@ pub fn find_all_possible_obstructions_old(lines: &str) -> u32 {
     return valid_obstructions.len() as u32;
 }
 
-pub fn find_all_possible_obstructions(lines: &str) -> u32 {
+pub fn find_all_possible_obstructions_old_2(lines: &str) -> u32 {
     let mut valid_obstructions: Vec<Position> = Vec::new();
     let mut visited_obstacles: Vec<Position> = Vec::new();
     let mut map = read_map(lines);
@@ -250,19 +250,19 @@ pub fn find_all_possible_obstructions(lines: &str) -> u32 {
 
         //let position_on_the_left = get_destination_position(source_position.clone(), 
         //    get_direction_rotating_from(guard_orientation.clone()));
-        
+
         //println!("New pos: {:?}", position_on_the_left);
 
 
         //if is_position_inside_of_map(position_on_the_left.clone(), map.clone()) &&
-            //is_obstacle(map[position_on_the_left.y as usize][position_on_the_left.x as usize]) //&& 
-            //visited_obstacles.get(visited_obstacles.len() - 1).unwrap() != &position_on_the_left 
-            //{
-            //visited_obstacles.push(position_on_the_left);
+        //is_obstacle(map[position_on_the_left.y as usize][position_on_the_left.x as usize]) //&&
+        //visited_obstacles.get(visited_obstacles.len() - 1).unwrap() != &position_on_the_left
+        //{
+        //visited_obstacles.push(position_on_the_left);
         //}
 
         let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
-        
+
         if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
             map[source_position.y as usize][source_position.x as usize] = 'X';
             break;
@@ -289,13 +289,109 @@ pub fn find_all_possible_obstructions(lines: &str) -> u32 {
         }
     };
     //print_map(&map);
-    //print_map_with_valid_obstructions(&map, &valid_obstructions);
+    print_map_with_valid_obstructions(&map, &valid_obstructions);
 
     return valid_obstructions.len() as u32;
 }
 
+pub fn find_all_possible_obstructions(lines: &str) -> u32 {
+    let mut valid_obstructions: Vec<Position> = Vec::new();
+    let mut moves: Vec<Move> = Vec::new();
+    let mut map = read_map(lines);
+    let guard_position = find_guard(map.clone());
+    let mut source_position = guard_position.clone();
+    let mut guard_orientation = get_facing_direction_of_guard(map[guard_position.y as usize][guard_position.x as usize]);
+
+    println!("First position: {:?}", guard_position.clone());
+
+    loop { // action loop
+        let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
+
+        if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
+            map[source_position.y as usize][source_position.x as usize] = 'X';
+            break;
+        }
+
+        let destination_cell = map[dest_position.y as usize][dest_position.x as usize];
+        if is_clear_way(destination_cell) {
+
+            if blocking_dest_redoes_a_move(map.clone(), moves.clone(), dest_position.clone()) {
+                if !valid_obstructions.contains(&dest_position) {
+                    valid_obstructions.push(dest_position.clone());
+                }
+            }
+            moves.push(Move { dir: guard_orientation, pos: dest_position.clone()});
+            /*if test_if_goes_forever(map.clone(), dest_position.clone()) {
+                valid_obstructions.push(dest_position.clone());
+            }*/
+
+            map[source_position.y as usize][source_position.x as usize] = 'X';
+            map[dest_position.y as usize][dest_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
+            source_position = dest_position;
+        }
+        else if is_obstacle(destination_cell) {
+            guard_orientation = get_direction_to_rotate_to(guard_orientation.clone());
+            map[source_position.y as usize][source_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
+        }
+    };
+    print_map_with_valid_obstructions(&map, &valid_obstructions);
+
+    return valid_obstructions.len() as u32;
+}
+
+pub fn blocking_dest_redoes_a_move(source_map: Vec<Vec<char>>, moves: Vec<Move>, obstruction_to_test: Position) -> bool {
+    let mut steps = 30000;
+    let mut moves_for_this = moves.clone();
+    let mut map = source_map.clone();
+    let guard_position = find_guard(map.clone());
+    let mut source_position = guard_position.clone();
+    let mut guard_orientation = get_facing_direction_of_guard(map[guard_position.y as usize][guard_position.x as usize]);
+    let original_guard_orientation = guard_orientation.clone();
+
+    loop { // action loop
+        steps -= 1;
+        if steps == 0 {
+            println!("Went to end of steps");
+            println!("Position to try: {:?}", obstruction_to_test);
+            return true;
+        }
+
+        let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
+
+        if dest_position == obstruction_to_test {
+            map[dest_position.y as usize][dest_position.x as usize] = '#';
+            guard_orientation = get_direction_to_rotate_to(guard_orientation.clone());
+            map[source_position.y as usize][source_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
+            continue;
+        }
+
+        if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
+            //println!("Came out of map");
+            return false;
+        }
+
+        let destination_cell = map[dest_position.y as usize][dest_position.x as usize];
+        if is_clear_way(destination_cell) {
+            let a_move = Move { dir: guard_orientation, pos: dest_position.clone() };
+            if moves_for_this.contains(&a_move) {
+                //println!("Went to end of moves");
+                println!("Obstructing: {:?} for position {:?}", original_guard_orientation, obstruction_to_test);
+                return true;
+            }
+            moves_for_this.push(a_move);
+            map[source_position.y as usize][source_position.x as usize] = 'X';
+            map[dest_position.y as usize][dest_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
+            source_position = dest_position;
+        }
+        else if is_obstacle(destination_cell) {
+            guard_orientation = get_direction_to_rotate_to(guard_orientation.clone());
+            map[source_position.y as usize][source_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
+        }
+    };
+}
+
 pub fn test_if_goes_forever(source_map: Vec<Vec<char>>, obstruction_to_test: Position) -> bool {
-    let mut steps = 10000;
+    let mut steps = 20000;
 
     let mut map = source_map.clone();
     let guard_position = find_guard(map.clone());
@@ -311,7 +407,7 @@ pub fn test_if_goes_forever(source_map: Vec<Vec<char>>, obstruction_to_test: Pos
         if steps == 0 {
             return true;
         }
-        
+
         let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
 
         if dest_position == obstruction_to_test {
@@ -322,7 +418,7 @@ pub fn test_if_goes_forever(source_map: Vec<Vec<char>>, obstruction_to_test: Pos
             map[source_position.y as usize][source_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
             continue;
         }
-        
+
         if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
             return false;
         }
@@ -349,7 +445,7 @@ pub fn get_all_obstacles(source_map: &Vec<Vec<char>>) -> Vec<Position> {
         let current_sub_vec: Vec<char> = source_map.get(i).unwrap().clone();
         for j in 0..current_sub_vec.len() {
             let current_element = source_map[i][j];
-            if (current_element == '#') 
+            if (current_element == '#')
             {
                 obstacles.push(Position {x: j as i32, y: i as i32})
             }
@@ -398,7 +494,7 @@ pub fn test_possible_obstruction(source_map: Vec<Vec<char>>, known_obstacles: Ve
     println!("{:?}", guard_orientation);*/
 
     loop { // action loop
-        
+
         let dest_position = get_destination_position(source_position.clone(), guard_orientation.clone());
 
         if dest_position == obstruction_to_test {
@@ -409,7 +505,7 @@ pub fn test_possible_obstruction(source_map: Vec<Vec<char>>, known_obstacles: Ve
             map[source_position.y as usize][source_position.x as usize] = get_guard_symbol_by_direction(guard_orientation);
             continue;
         }
-        
+
         if !is_position_inside_of_map(dest_position.clone(), map.clone()) {
             return false;
         }
@@ -483,11 +579,11 @@ mod tests {
         assert_eq!(obstacles, result);
     }
 
-    #[test] 
+    #[test]
     fn given_a_map_find_all_working_obstacles() {
-        
+
     }
-    
+
     #[test]
     fn given_known_obstruction_possibility_it_is_recognized() {
         let input = "....#.....
@@ -511,7 +607,7 @@ mod tests {
 
         assert_eq!(true, result);
     }
-    
+
     #[test]
     fn given_obstruction_in_a_square_it_is_recognized() {
         let input = ".#.
@@ -528,7 +624,7 @@ mod tests {
 
         assert_eq!(true, result);
     }
-    
+
     #[test]
     fn given_obstruction_that_might_fail_should_be_recognized() {
         let input = "..#..
@@ -549,7 +645,7 @@ mod tests {
 
         assert_eq!(true, result);
     }
-    
+
     #[test]
     fn given_obstruction_with_longer_known_list_return_true() {
         let input = "....#.....
@@ -576,7 +672,7 @@ mod tests {
 
         assert_eq!(true, result);
     }
-    
+
     #[test]
     fn given_obstruction_that_pushes_outside_boundary_return_false() {
         let input = "....#.....
@@ -619,7 +715,7 @@ mod tests {
 ..#";
 
         let result = get_amount_of_x(read_map(input));
-        
+
         assert_eq!(3, result);
     }
 
@@ -631,7 +727,7 @@ mod tests {
 
         let map = read_map(input);
         let result = is_position_inside_of_map(position, map);
-        
+
         assert_eq!(false, result);
     }
 
@@ -643,7 +739,7 @@ mod tests {
 
         let map = read_map(input);
         let result = is_position_inside_of_map(position, map);
-        
+
         assert_eq!(false, result);
     }
 
@@ -660,7 +756,7 @@ mod tests {
     fn given_a_map_it_can_be_read_with_obstacles_and_clear_ways() {
         let input = ".#
 ..";
-        
+
         let result = read_map(input);
 
         assert_eq!(true, is_clear_way(result[1][0]));
@@ -673,7 +769,7 @@ mod tests {
 ..";
 
         let result = read_map(input);
-        
+
         assert_eq!(true, is_guard(result[0][1]));
     }
 
@@ -684,7 +780,7 @@ mod tests {
 
         let map = read_map(input);
         let guard_position = find_guard(map);
-        
+
         assert_eq!(Position {x: 1, y: 0}, guard_position);
     }
 
@@ -694,7 +790,7 @@ mod tests {
 ..";
 
         let result = read_map(input);
-        
+
         assert_eq!(true, is_guard(result[0][1]));
     }
 
@@ -719,7 +815,7 @@ mod tests {
         given_a_guard_get_direction_guard_is_facing_south: ('v', Direction::South)
         given_a_guard_get_direction_guard_is_facing_west: ('<', Direction::West)
     }
-    
+
     #[test]
     #[should_panic]
     fn given_no_guard_direction_should_panic() {
@@ -727,10 +823,11 @@ mod tests {
 
         let result = get_facing_direction_of_guard(input);
     }
-    
+
     #[test]
     fn expecting_la_patente_to_fail() {
         let input = "[input]";
+        // real result is 1933, thanks to https://github.com/nick42d/aoc-2024 for the solution shared on Reddit. I wonder what the flaw in my algo is but it worked thanks to him.
 
         let result = find_all_possible_obstructions(input);
 
